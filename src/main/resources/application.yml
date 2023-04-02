@@ -1,0 +1,19 @@
+spring:
+   application:
+      name: SearchService
+server:
+    port: 8081
+
+elastic:
+    product:
+       indexName: products
+    category:
+       indexName: categories
+    movie:
+       indexName: idx_movies
+es:
+  hostname: ${elastic_search_host}
+  port: ${elastic_search_port}
+  username: ${elastic_search_username}
+  password: ${elastic_search_password}
+  scheme: ${elastic_search_scheme}

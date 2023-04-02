@@ -1,0 +1,68 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nagp-amcart-namespace
+
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: search-lb-service
+  namespace: nagp-amcart-namespace
+spec:
+  type: LoadBalancer
+  selector:
+    app: search-service
+  ports:
+  - port: 80
+    targetPort: 8081
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: search-config
+  namespace: nagp-amcart-namespace
+data:
+  elastic_search_host: 'elasticsearch-service'
+  elastic_search_port: '9200'
+  elastic_search_scheme: 'http'
+  elastic_search_username: 'elastic'
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: search-secret
+  namespace: nagp-amcart-namespace
+type: Opaque
+data:
+  elastic_search_password: cmFrZXNoQDEyMw==
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: search-deployment
+  namespace: nagp-amcart-namespace
+spec:
+  selector:
+      matchLabels:
+        app: search-service
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: search-service
+    spec:
+      containers:
+       - name: search-service
+         image: us-central1-docker.pkg.dev/nagp-amcart-rakesh/nagp-amcart-repo/search-service:v1
+         ports:
+         - containerPort: 8081
+         envFrom:
+            - configMapRef:
+                name: search-config
+            - secretRef:
+                name: search-secret

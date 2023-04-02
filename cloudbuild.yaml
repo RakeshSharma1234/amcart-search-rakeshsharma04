@@ -1,0 +1,17 @@
+steps:
+  - name: maven:3.8.6-eclipse-temurin-11-alpine
+    entrypoint: mvn
+    args: ["package", "-Dmaven.test.skip=true"]
+  - name: gcr.io/cloud-builders/docker
+    args: ["build", "-t", "us-central1-docker.pkg.dev/nagp-amcart-rakesh/nagp-amcart-repo/search-service:v1", "."]
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'us-central1-docker.pkg.dev/nagp-amcart-rakesh/nagp-amcart-repo/search-service:v1']
+  - name: 'gcr.io/cloud-builders/gke-deploy:stable'
+    args:
+    - run
+    - --filename=./manifests/
+    - --image=us-central1-docker.pkg.dev/nagp-amcart-rakesh/nagp-amcart-repo/search-service:v1
+    - --location=us-central1-a
+    - --cluster=nagpamcartcluster
+images:
+- 'us-central1-docker.pkg.dev/nagp-amcart-rakesh/nagp-amcart-repo/search-service:v1'
