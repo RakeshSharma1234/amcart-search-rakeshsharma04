@@ -15,3 +15,5 @@ steps:
     - --cluster=nagpamcartcluster
 images:
 - 'us-central1-docker.pkg.dev/nagp-amcart-rakesh/nagp-amcart-repo/search-service:v1'
+options:
+  logging: CLOUD_LOGGING_ONLY
