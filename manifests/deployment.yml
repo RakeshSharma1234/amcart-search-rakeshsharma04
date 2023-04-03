@@ -25,7 +25,7 @@ metadata:
   name: search-config
   namespace: nagp-amcart-namespace
 data:
-  elastic_search_host: 'elasticsearch-service'
+  elastic_search_host: 'elasticsearch-service.nagp-amcart-namespace.svc.cluster.local'
   elastic_search_port: '9200'
   elastic_search_scheme: 'http'
   elastic_search_username: 'elastic'
