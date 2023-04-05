@@ -17,3 +17,7 @@ es:
   username: ${elastic_search_username}
   password: ${elastic_search_password}
   scheme: ${elastic_search_scheme}
+
+management:
+  endpoints:
+    enabled-by-default: true
