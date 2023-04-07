@@ -30,6 +30,9 @@ public class ProductSearchDTO {
 	@Max(20)
 	private int size = 15;
 
+	
+	private int from = 0;
+
 	@Singular
 	private List<String> brands;
 

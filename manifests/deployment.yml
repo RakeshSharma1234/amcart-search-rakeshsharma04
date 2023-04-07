@@ -59,10 +59,25 @@ spec:
       containers:
        - name: search-service
          image: us-central1-docker.pkg.dev/nagp-amcart-rakesh/nagp-amcart-repo/search-service:v1
-         ports:
-         - containerPort: 8081
+         imagePullPolicy: Always
          envFrom:
             - configMapRef:
                 name: search-config
             - secretRef:
                 name: search-secret
+         ports:
+         - containerPort: 8081
+         livenessProbe:
+              httpGet:
+                path: /actuator/health
+                port: 8081
+              initialDelaySeconds: 30
+              periodSeconds: 30
+              failureThreshold: 3
+         readinessProbe:
+              httpGet:
+                path: /actuator/health
+                port: 8081
+              initialDelaySeconds: 15
+              periodSeconds: 30
+              failureThreshold: 3

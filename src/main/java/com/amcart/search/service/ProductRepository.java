@@ -39,17 +39,21 @@ import com.amcart.search.model.Product;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.ElasticsearchException;
+import co.elastic.clients.elasticsearch._types.FieldSort;
 import co.elastic.clients.elasticsearch._types.FieldValue;
+import co.elastic.clients.elasticsearch._types.SortOrder;
 import co.elastic.clients.elasticsearch._types.aggregations.Aggregation;
 import co.elastic.clients.elasticsearch._types.aggregations.TermsAggregation;
 import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
 import co.elastic.clients.elasticsearch._types.query_dsl.MatchAllQuery;
+import co.elastic.clients.elasticsearch._types.query_dsl.MatchPhraseQuery;
 import co.elastic.clients.elasticsearch._types.query_dsl.MatchQuery;
 import co.elastic.clients.elasticsearch._types.query_dsl.MultiMatchQuery;
 import co.elastic.clients.elasticsearch._types.query_dsl.Operator;
 import co.elastic.clients.elasticsearch._types.query_dsl.Query;
 import co.elastic.clients.elasticsearch._types.query_dsl.TermsQuery;
 import co.elastic.clients.elasticsearch._types.query_dsl.TermsQueryField;
+import co.elastic.clients.elasticsearch._types.query_dsl.WildcardQuery;
 import co.elastic.clients.elasticsearch.core.BulkRequest;
 import co.elastic.clients.elasticsearch.core.BulkResponse;
 import co.elastic.clients.elasticsearch.core.DeleteRequest;
@@ -143,7 +147,7 @@ public class ProductRepository {
 
 	public ProductCatalogDTO searchByText(ProductSearchDTO searchDTO) throws IOException {
 		SearchRequest searchRequest = getSearchRequest(searchDTO.getText(), searchDTO.getSize(),
-				Collections.emptyList(), Collections.emptyMap(), searchDTO.getMapFilters());
+				searchDTO.getFrom(), Collections.emptyMap(), searchDTO.getMapFilters());
 		var response = elasticsearchClient.search(searchRequest, Product.class);
 		var products = new ArrayList<ProductDTO>();
 		getResultDocuments(response, products);
@@ -162,36 +166,36 @@ public class ProductRepository {
 	}
 
 	public Object getFacets(@Valid ProductSearchDTO searchDTO) throws IOException {
-		var response = getFacets(searchDTO.getText(), Collections.emptyList(), Collections.emptyMap());
+		var response = getFacets(searchDTO.getText(), Collections.emptyMap());
 		return parseResults(response, List.of(FACET_BRAND_NAME, FACET_COLOR_NAME, FACET_PRODUCT_TYPE_NAME,
 				FACET_PRODUCT_SIZES_NAME, FACET_PRODUCT_DISCOUNT_NAME));
 	}
 
-	private SearchResponse<Void> getFacets(String term, List<String> searchAfter, Map<String, List<String>> filters)
+	private SearchResponse<Void> getFacets(String term, Map<String, List<String>> filters)
 			throws IOException {
 		Map<String, Aggregation> map = new HashMap<>();
-		map.put(FACET_BRAND_NAME, new Aggregation.Builder()
-				.terms(new TermsAggregation.Builder().field(FACET_BRAND).build()).build());
-		map.put(FACET_COLOR_NAME, new Aggregation.Builder()
-				.terms(new TermsAggregation.Builder().field(FACET_COLOR).build()).build());
+		map.put(FACET_BRAND_NAME,
+				new Aggregation.Builder().terms(new TermsAggregation.Builder().field(FACET_BRAND).build()).build());
+		map.put(FACET_COLOR_NAME,
+				new Aggregation.Builder().terms(new TermsAggregation.Builder().field(FACET_COLOR).build()).build());
 		map.put(FACET_PRODUCT_TYPE_NAME, new Aggregation.Builder()
 				.terms(new TermsAggregation.Builder().field(FACET_PRODUCT_TYPE).build()).build());
 		map.put(FACET_PRODUCT_SIZES_NAME, new Aggregation.Builder()
 				.terms(new TermsAggregation.Builder().field(FACET_PRODUCT_SIZES).build()).build());
 		map.put(FACET_PRODUCT_DISCOUNT_NAME, new Aggregation.Builder()
 				.terms(new TermsAggregation.Builder().field(FACET_PRODUCT_DISCOUNT).build()).build());
-		SearchRequest searchRequest = getSearchRequest(term, 0, searchAfter, map, filters);
+		SearchRequest searchRequest = getSearchRequest(term, 0, 0, map, filters);
 		return elasticsearchClient.search(searchRequest, Void.class);
 	}
 
-	private SearchRequest getSearchRequest(String term, int size, List<String> searchAfter,
+	private SearchRequest getSearchRequest(String term, int size, int from,
 			Map<String, Aggregation> map, Map<String, List<String>> filters) {
 		return SearchRequest.of(s -> {
 			s.index(indexName);
+			s.from(from);
 			s.size(size);
+			s.sort(sort -> sort.field(FieldSort.of(f->f.field("id.keyword").order(SortOrder.Asc))));
 			addQuery(s, term, filters);
-			// addSearchAfter(searchAfter, s);
-			// addSort(s);
 			addAggregation(map, s);
 			return s;
 		});
@@ -213,18 +217,44 @@ public class ProductRepository {
 
 	private void buildBoolQuery(Builder builder, String term, Map<String, List<String>> mapFilters) {
 		var filters = getFilters(mapFilters);
-		var matchQuery = Query.of(q -> q.match(MatchQuery
-				.of(m -> m.field(ProductFieldAttr.Product.NAME_FIELD).field(ProductFieldAttr.Product.CATEGORY_FIELD).query(term).operator(Operator.And).boost(10f))));
+
+		var matchQuery = Query.of(
+				q -> q.match(MatchQuery.of(m -> m.field(ProductFieldAttr.Product.NAME_FIELD).query(term).boost(10f))));
+
+		var matchCategoryQuery = Query.of(q -> q
+				.match(MatchQuery.of(m -> m.field(ProductFieldAttr.Product.CATEGORY_FIELD).query(term).boost(10f))));
+
 		var multiMatchQuery = Query.of(q -> q.multiMatch(MultiMatchQuery.of(m -> m
 				.fields(applyFieldBoost(ProductFieldAttr.Product.NAME_FIELD, 5),
-						applyFieldBoost(ProductFieldAttr.Product.DESCRIPTION_FIELD, 2),
-						applyFieldBoost(ProductFieldAttr.Product.CATEGORY_FIELD, 5),
+						applyFieldBoost(ProductFieldAttr.Product.CATEGORY_FIELD, 3),
 						applyFieldBoost(ProductFieldAttr.Product.BRAND_FIELD, 4),
+						applyFieldBoost(ProductFieldAttr.Product.COLOR_FIELD, 3),
 						applyFieldBoost(ProductFieldAttr.Product.PRODUCT_TYPE_FIELD, 3))
 				.operator(Operator.And).query(term))));
+
+		var wildCardNameQuery = Query.of(q -> q.wildcard(WildcardQuery.of(w -> w.caseInsensitive(true)
+				.field(ProductFieldAttr.Product.NAME_FIELD).value(term + "*").boost(5.0f))));
+		var wildCardBrandQuery = Query.of(q -> q.wildcard(WildcardQuery.of(w -> w.caseInsensitive(true)
+				.field(ProductFieldAttr.Product.BRAND_FIELD).value(term + "*").boost(4.0f))));
+		var wildCardColorQuery = Query.of(q -> q.wildcard(WildcardQuery.of(w -> w.caseInsensitive(true)
+				.field(ProductFieldAttr.Product.COLOR_FIELD).value(term + "*").boost(2.0f))));
+		var wildCardTypeQuery = Query.of(q -> q.wildcard(WildcardQuery.of(w -> w.caseInsensitive(true)
+				.field(ProductFieldAttr.Product.PRODUCT_TYPE_FIELD).value(term + "*").boost(3.0f))));
+
+		var matchPhraseQuery = Query.of(q -> q.matchPhrase(MatchPhraseQuery.of(p -> p.field("name").query(term))));
+
+//		List<FieldValue> fieldValues = new ArrayList<>();
+//		for (String t : term.split(" ")) {
+//			fieldValues.add(FieldValue.of(t));
+//		}
+//
+//		var termsQuery = Query.of(q -> q.terms(t -> t.field("name").terms(o -> o.value(fieldValues))));
+//
+
 		var boolQuery = BoolQuery.of(bq -> {
 			bq.filter(filters);
-			bq.should(matchQuery, multiMatchQuery);
+			bq.should(matchQuery, matchCategoryQuery, matchPhraseQuery, multiMatchQuery, wildCardNameQuery,
+					wildCardBrandQuery, wildCardTypeQuery, wildCardColorQuery);
 			bq.minimumShouldMatch("1");
 			return bq;
 		});

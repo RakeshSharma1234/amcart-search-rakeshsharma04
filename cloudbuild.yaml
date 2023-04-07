@@ -11,7 +11,7 @@ steps:
     - run
     - --filename=./manifests/
     - --image=us-central1-docker.pkg.dev/nagp-amcart-rakesh/nagp-amcart-repo/search-service:v1
-    - --location=us-central1-c
+    - --location=us-central1-a
     - --cluster=nagpamcartcluster
 images:
 - 'us-central1-docker.pkg.dev/nagp-amcart-rakesh/nagp-amcart-repo/search-service:v1'
