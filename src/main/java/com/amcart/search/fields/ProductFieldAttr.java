@@ -27,16 +27,6 @@ public final class ProductFieldAttr {
     public static final String PRODUCT_DISCOUNT_FIELD = "productDiscount.keyword";
   }
 
-  public static class Suggest {
-
-    private Suggest() {
-    }
-
-    public static final String TITLE_SUGGEST = "title_suggest";
-    public static final String TITLE_SUGGEST_NAME = "title-suggest";
-    public static final String DID_YOU_MEAN = "did_you_mean";
-  }
-
   public static class Aggregations {
 
     private Aggregations() {

@@ -16,9 +16,11 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import javax.validation.Valid;
@@ -146,8 +148,8 @@ public class ProductRepository {
 	}
 
 	public ProductCatalogDTO searchByText(ProductSearchDTO searchDTO) throws IOException {
-		SearchRequest searchRequest = getSearchRequest(searchDTO.getText(), searchDTO.getSize(),
-				searchDTO.getFrom(), Collections.emptyMap(), searchDTO.getMapFilters());
+		SearchRequest searchRequest = getSearchRequest(searchDTO.getText(), searchDTO.getSize(), searchDTO.getFrom(),
+				Collections.emptyMap(), searchDTO.getMapFilters());
 		var response = elasticsearchClient.search(searchRequest, Product.class);
 		var products = new ArrayList<ProductDTO>();
 		getResultDocuments(response, products);
@@ -171,8 +173,7 @@ public class ProductRepository {
 				FACET_PRODUCT_SIZES_NAME, FACET_PRODUCT_DISCOUNT_NAME));
 	}
 
-	private SearchResponse<Void> getFacets(String term, Map<String, List<String>> filters)
-			throws IOException {
+	private SearchResponse<Void> getFacets(String term, Map<String, List<String>> filters) throws IOException {
 		Map<String, Aggregation> map = new HashMap<>();
 		map.put(FACET_BRAND_NAME,
 				new Aggregation.Builder().terms(new TermsAggregation.Builder().field(FACET_BRAND).build()).build());
@@ -188,13 +189,13 @@ public class ProductRepository {
 		return elasticsearchClient.search(searchRequest, Void.class);
 	}
 
-	private SearchRequest getSearchRequest(String term, int size, int from,
-			Map<String, Aggregation> map, Map<String, List<String>> filters) {
+	private SearchRequest getSearchRequest(String term, int size, int from, Map<String, Aggregation> map,
+			Map<String, List<String>> filters) {
 		return SearchRequest.of(s -> {
 			s.index(indexName);
 			s.from(from);
 			s.size(size);
-			s.sort(sort -> sort.field(FieldSort.of(f->f.field("id.keyword").order(SortOrder.Asc))));
+			s.sort(sort -> sort.field(FieldSort.of(f -> f.field("id.keyword").order(SortOrder.Asc))));
 			addQuery(s, term, filters);
 			addAggregation(map, s);
 			return s;
@@ -242,14 +243,6 @@ public class ProductRepository {
 				.field(ProductFieldAttr.Product.PRODUCT_TYPE_FIELD).value(term + "*").boost(3.0f))));
 
 		var matchPhraseQuery = Query.of(q -> q.matchPhrase(MatchPhraseQuery.of(p -> p.field("name").query(term))));
-
-//		List<FieldValue> fieldValues = new ArrayList<>();
-//		for (String t : term.split(" ")) {
-//			fieldValues.add(FieldValue.of(t));
-//		}
-//
-//		var termsQuery = Query.of(q -> q.terms(t -> t.field("name").terms(o -> o.value(fieldValues))));
-//
 
 		var boolQuery = BoolQuery.of(bq -> {
 			bq.filter(filters);
@@ -337,7 +330,6 @@ public class ProductRepository {
 	private void getResultDocuments(SearchResponse<Product> response, ArrayList<ProductDTO> products) {
 		for (var hit : response.hits().hits()) {
 			var dto = mapper.toDto(hit.source());
-			// dto.setSearchAfter(new Object[] { hit.score(), dto.getCode() });
 			products.add(dto);
 		}
 	}
@@ -348,5 +340,21 @@ public class ProductRepository {
 
 	private String applyFieldBoost(String field, int boost) {
 		return String.format("%s^%s", field, boost);
+	}
+
+	public Set<String> getSuggestions(ProductSearchDTO searchDTO) throws IOException {
+		var suggestionProducts = new HashSet<String>();
+		SearchRequest searchRequest = SearchRequest.of(s -> s.index(indexName).size(searchDTO.getSize())
+				.query(q -> q.matchPhrasePrefix(m -> m.field("name").query(searchDTO.getText()))));
+		SearchResponse<Product> response = elasticsearchClient.search(searchRequest, Product.class);
+		getProductNames(response, suggestionProducts);
+		return suggestionProducts;
+	}
+
+	private void getProductNames(SearchResponse<Product> response, Set<String> products) {
+		for (var hit : response.hits().hits()) {
+			var dto = mapper.toDto(hit.source());
+			products.add(dto.getName());
+		}
 	}
 }

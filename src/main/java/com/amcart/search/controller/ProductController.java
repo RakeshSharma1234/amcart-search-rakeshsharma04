@@ -2,6 +2,7 @@ package com.amcart.search.controller;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 
 import javax.validation.Valid;
 
@@ -71,5 +72,10 @@ public class ProductController {
     @GetMapping("/facets")
     public ResponseEntity<Object> getFacets(@Valid ProductSearchDTO searchDTO) throws IOException {
       return new ResponseEntity<>(productRepository.getFacets(searchDTO), HttpStatus.OK);
+    }
+    
+    @GetMapping("/autocomplete")
+    public ResponseEntity<Set<String>> getSuggestions(@Valid ProductSearchDTO searchDTO) throws IOException {
+      return ResponseEntity.ok(productRepository.getSuggestions(searchDTO));
     }
 }
