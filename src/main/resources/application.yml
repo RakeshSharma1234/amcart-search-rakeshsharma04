@@ -21,3 +21,7 @@ es:
 management:
   endpoints:
     enabled-by-default: true
+    
+logging:
+  level:
+    '[org.springframework.web]': debug

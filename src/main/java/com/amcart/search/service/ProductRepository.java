@@ -168,7 +168,7 @@ public class ProductRepository {
 	}
 
 	public Object getFacets(@Valid ProductSearchDTO searchDTO) throws IOException {
-		var response = getFacets(searchDTO.getText(), Collections.emptyMap());
+		var response = getFacets(searchDTO.getText(), searchDTO.getMapFilters());
 		return parseResults(response, List.of(FACET_BRAND_NAME, FACET_COLOR_NAME, FACET_PRODUCT_TYPE_NAME,
 				FACET_PRODUCT_SIZES_NAME, FACET_PRODUCT_DISCOUNT_NAME));
 	}
